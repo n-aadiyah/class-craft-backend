@@ -38,7 +38,11 @@ app.get("/", (req, res) => {
 
 // Import routes
 const authRoutes = require("./routes/auth");
+const attendanceRoutes = require("./routes/attendanceRoutes");
+
+// Use routes
 app.use("/api/auth", authRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
