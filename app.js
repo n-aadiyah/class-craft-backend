@@ -15,7 +15,16 @@ app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
 app.use(cookieParser());
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000", // for local testing
+      "https://class-craft-school.netlify.app", // your live frontend
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true, // allows cookies or authorization headers if needed
+  })
+);
 // Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
