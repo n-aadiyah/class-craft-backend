@@ -39,10 +39,14 @@ app.get("/", (req, res) => {
 // Import routes
 const authRoutes = require("./routes/auth");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const classRoutes = require("./routes/classRoutes");
+const studentRoutes = require("./routes/studentRoutes");
 
 // Use routes
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/classes", classRoutes);
+app.use("/api/students", studentRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
