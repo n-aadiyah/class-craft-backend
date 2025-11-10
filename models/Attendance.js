@@ -17,8 +17,7 @@ const attendanceSchema = new mongoose.Schema(
   type: mongoose.Schema.Types.ObjectId,
   ref: "Student",
   required: true,
-}
-,
+},
         studentName: String,
         enrollNo: String,
         status: {
@@ -31,5 +30,7 @@ const attendanceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+// 🚀 Speed up history lookups
+attendanceSchema.index({ className: 1, date: -1 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);
