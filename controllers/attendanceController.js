@@ -174,6 +174,7 @@ exports.getMonthlyAttendance = async (req, res) => {
     // 2) Load all students for the class (always show everyone)
     const students = await Student.find({ classId: cls._id })
       .select("_id name enrollNo")
+       .sort({ name: 1 })  
       .lean();
 
     // 3) Load all attendance sessions for that month (using dateOnlyUTC for speed/accuracy)

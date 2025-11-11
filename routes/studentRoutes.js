@@ -5,7 +5,8 @@ const Student = require("../models/Student");
 // ✅ Get all students (optional — for admin overview)
 router.get("/", async (req, res) => {
   try {
-    const students = await Student.find().populate("classId", "name grade");
+    const students = await Student.find().populate("classId", "name grade")
+      .sort({ name: 1 });
     res.status(200).json(students);
   } catch (error) {
     res.status(500).json({ message: "Error fetching students", error });
@@ -15,7 +16,9 @@ router.get("/", async (req, res) => {
 // ✅ Get all students for a specific class
 router.get("/class/:classId", async (req, res) => {
   try {
-    const students = await Student.find({ classId: req.params.classId });
+    const students = await Student.find({ classId: req.params.classId })
+      .populate("classId", "name grade")
+      .sort({ name: 1 });
     res.status(200).json(students);
   } catch (error) {
     res.status(500).json({ message: "Error fetching students for class", error });
