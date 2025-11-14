@@ -5,17 +5,14 @@ const {
   saveAttendance,
   getAttendanceByClass,
   getAttendanceHistory,
-  getMonthlyAttendance,
+  getMonthlyAttendance
 } = require("../controllers/attendanceController");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
-// POST → Save attendance
-router.post("/save", saveAttendance);
-// GET → Get attendance history
-router.get("/history", getAttendanceHistory);
-// GET → Get all attendance for a class
-router.get("/class/:className", getAttendanceByClass);
+// secure endpoints
+router.post("/save", authMiddleware, saveAttendance);
+router.get("/history", authMiddleware, getAttendanceHistory);
+router.get("/class/:className", authMiddleware, getAttendanceByClass);
+router.get("/monthly", authMiddleware, getMonthlyAttendance);
 
-// ⬇️ NEW: Monthly matrix
-// GET /api/attendance/monthly?className=Grade%208%20-%20A&year=2025&month=11
-router.get("/monthly", getMonthlyAttendance);
 module.exports = router;
