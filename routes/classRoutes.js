@@ -137,24 +137,61 @@ router.put("/:id", authMiddleware, async (req, res) => {
  * DELETE /api/classes/:id
  * Delete — owner or admin only
  */
+// DEBUG/robust DELETE /api/classes/:id
+// Diagnostic DELETE /api/classes/:id
 router.delete("/:id", authMiddleware, async (req, res) => {
+  console.log("[CLASS-DELETE] handler invoked at", new Date().toISOString());
   try {
     const { id } = req.params;
+    console.log("[CLASS-DELETE] received id:", id);
+    console.log("DELETE called - id:", id, "isValidId:", isValidObjectId(id));
+    console.log("req.user:", req.user);
+
     if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid class id" });
 
     const cls = await Class.findById(id);
+    console.log("cls truthy:", !!cls);
+
     if (!cls) return res.status(404).json({ message: "Class not found" });
 
-    if (String(cls.teacher) !== String(req.user.id) && req.user.role !== "admin") {
+    // Diagnostics: inspect the object returned
+    try {
+      const proto = Object.getPrototypeOf(cls);
+      console.log("cls typeof:", typeof cls);
+      console.log("cls constructor name:", cls?.constructor?.name);
+      console.log("cls prototype constructor name:", proto?.constructor?.name);
+      console.log("cls has deleteOne:", typeof cls.deleteOne === "function");
+      console.log("cls has remove:", typeof cls.remove === "function");
+      console.log("cls keys:", Object.keys(cls).slice(0,50)); // show up to 50 keys
+    } catch (diagErr) {
+      console.error("Diagnostic inspection error:", diagErr);
+    }
+
+    const userId = req.user?.id || req.user?._id;
+    console.log("owner compare:", { classTeacher: String(cls.teacher), userId, role: req.user?.role });
+
+    if (String(cls.teacher) !== String(userId) && req.user?.role !== "admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    await cls.remove();
-    res.json({ message: "Class deleted" });
+    // Safe delete: try document.deleteOne(), fallback to Model.deleteOne
+    if (typeof cls.deleteOne === "function") {
+      console.log("Using cls.deleteOne()");
+      await cls.deleteOne();
+    } else if (typeof cls.remove === "function") {
+      console.log("Using cls.remove()");
+      await cls.remove();
+    } else {
+      console.log("Falling back to Class.deleteOne()");
+      await Class.deleteOne({ _id: id });
+    }
+
+    return res.status(200).json({ message: "Class deleted" });
   } catch (err) {
-    console.error("Error deleting class:", err);
-    res.status(400).json({ message: "Error deleting class", error: err.message });
+    console.error("Error deleting class (detailed):", err);
+    return res.status(500).json({ message: "Error deleting class", error: err.message });
   }
 });
+
 
 module.exports = router;

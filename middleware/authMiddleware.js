@@ -10,11 +10,11 @@ exports.authMiddleware = (req, res, next) => {
     const payload = jwt.verify(token, secret);
     // payload expected to carry { id, role, name, email }
     req.user = {
-      id: payload.id,
+      id: payload.id || payload._id || payload.userId || null,
       role: payload.role,
-      name: payload.name,
       email: payload.email,
     };
+    if (!req.user.id) return res.status(401).json({ message: "Invalid token payload" });
     next();
   } catch (err) {
     console.error("authMiddleware error:", err);
