@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
-
+const path = require("path");  
 // Load environment variables
 dotenv.config();
 
@@ -41,13 +41,15 @@ const authRoutes = require("./routes/auth");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const classRoutes = require("./routes/classRoutes");
 const studentRoutes = require("./routes/studentRoutes");
-
+const userRoutes = require('./routes/userRoutes');
 // Use routes
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/students", studentRoutes);
-
+app.use('/api/users', userRoutes);
 // Start server
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

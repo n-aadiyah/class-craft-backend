@@ -43,6 +43,27 @@ async function ensureClassOwnershipOrAdmin(classId, user) {
  * - Admin: returns all students
  * - Teacher: returns students belonging to teacher's classes
  */
+router.get("/count-by-teacher", authMiddleware, async (req, res) => {
+  try {
+    const teacherId = req.user?.id;
+    if (!teacherId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Find class ids owned by the teacher
+    const classes = await Class.find({ teacher: teacherId }).select("_id").lean();
+    const classIds = classes.map((c) => c._id);
+    if (classIds.length === 0) {
+      return res.json({ totalStudents: 0 });
+    }
+
+    // Count students whose classId is in teacher's classes
+    const totalStudents = await Student.countDocuments({ classId: { $in: classIds } });
+
+    return res.json({ totalStudents });
+  } catch (err) {
+    console.error("Error in GET /students/count-by-teacher:", err);
+    return res.status(500).json({ message: "Error counting students", error: err.message });
+  }
+});
 router.get("/", authMiddleware, async (req, res) => {
   try {
     if (req.user.role === "admin") {
