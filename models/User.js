@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
   avatarUrl: { type: String, default: "/Avatar.jpg" },
   preferences: {
+    avatarUrl: { type: String, default: "/Avatar.jpg" },
     notifications: { type: Boolean, default: true },
     theme: { type: String, default: "light" },
     language: { type: String, default: "English" },

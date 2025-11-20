@@ -55,45 +55,66 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// ✅ LOGIN - POST /api/auth/login
+// routes/auth.js — robust debug login handler
 router.post("/login", async (req, res) => {
   try {
-    const { email, password,role } = req.body;
+    const { email, password, role } = req.body;
 
-    // Check for missing fields
-    if (!email || !password || !role) {
-      return res.status(400).json({ message: "All fields are required" });
+    // require only email + password
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // Check JWT secret exists
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET missing in .env file");
+      console.error("JWT_SECRET missing in .env");
       return res.status(500).json({ message: "Server configuration error" });
     }
 
-    // Find user
-    const user = await User.findOne({ email: email.toLowerCase() });
+    // fetch user including the password (schema has select: false)
+    const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
+
+    console.log("DEBUG login: user fetched:", !!user, user ? { id: user._id, role: user.role } : null);
+
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-    //check role match 
-    if(!(user.role===role)){
-        return res.status(401).json({ message: "Access denied:incorrect role " });
+
+    // show actual stored password shape for debugging (truncate for safety)
+    const stored = user.password;
+    console.log("DEBUG login: typeof stored password:", typeof stored);
+    if (stored && typeof stored === "string") {
+      console.log("DEBUG login: stored hash (start):", stored.slice(0, 10));
+    } else {
+      console.log("DEBUG login: stored password value is falsy or not string:", stored);
     }
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
+
+    // optional: role match check
+    if (role && user.role !== role) {
+      return res.status(403).json({ message: "Role mismatch" });
+    }
+
+    // Defensive: if stored hash is missing or not a string -> error
+    if (!stored || typeof stored !== "string") {
+      console.error("Login error: user.password missing or malformed for user:", user._id);
+      return res.status(500).json({ message: "Server misconfiguration: user password missing or malformed" });
+    }
+
+    // Use synchronous compare to avoid callback/promise mismatch across bcrypt libraries
+    let isMatch = false;
+    try {
+      isMatch = bcrypt.compareSync(password, stored);
+    } catch (cmpErr) {
+      console.error("bcrypt.compareSync error:", cmpErr && cmpErr.stack ? cmpErr.stack : cmpErr);
+      return res.status(500).json({ message: "Server error verifying password", error: String(cmpErr) });
+    }
+
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Create JWT token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Login successful",
       token,
       user: {
@@ -101,12 +122,14 @@ router.post("/login", async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatarUrl: user.avatarUrl,
       },
     });
   } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: "Server error during login" });
+    console.error("Login Error (catch):", error && error.stack ? error.stack : error);
+    return res.status(500).json({ message: "Server error during login", error: error.message || String(error) });
   }
 });
+
 
 module.exports = router;
