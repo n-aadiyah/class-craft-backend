@@ -19,7 +19,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000", // for local testing
-      "https://classcraft-school.netlify.app", // your live frontend
+      "https://class-craft-gayatri.netlify.app", // your live frontend
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true, // allows cookies or authorization headers if needed
