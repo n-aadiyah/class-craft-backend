@@ -25,6 +25,8 @@ function requireAdmin(req, res, next) {
  * Return summary counts for admin dashboard
  */
 router.get("/dashboard-stats", authMiddleware, requireAdmin, async (req, res) => {
+   console.log("🔥 DASHBOARD STATS ROUTE HIT");
+  res.json({ ok: true });
   try {
     const Class = require("../models/Class");
     const Student = require("../models/Student");
