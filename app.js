@@ -42,7 +42,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const classRoutes = require("./routes/classRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const userRoutes = require('./routes/userRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+const adminRoutes = require("./routes/adminRoutes");
 // Use routes
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
