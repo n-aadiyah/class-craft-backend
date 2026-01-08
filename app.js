@@ -49,7 +49,7 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/students", studentRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/admin', adminRoutes);
+app.use("/api/admin", adminRoutes);
 // Start server
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
