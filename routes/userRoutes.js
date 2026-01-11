@@ -193,5 +193,33 @@ router.delete("/me", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Error deleting account", error: err.message });
   }
 });
+// GET /api/users/unassigned-students
+router.get(
+  "/unassigned-students",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "teacher" && req.user.role !== "admin") {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      // users already linked to Student
+      const assignedUserIds = await require("../models/Student").distinct("user");
+
+      const users = await User.find({
+        role: "student",
+        _id: { $nin: assignedUserIds },
+      })
+        .select("_id email")
+        .lean();
+
+      res.json(users);
+    } catch (err) {
+      console.error("GET /users/unassigned-students error:", err);
+      res.status(500).json({ message: "Failed to load students" });
+    }
+  }
+);
+
 
 module.exports = router;

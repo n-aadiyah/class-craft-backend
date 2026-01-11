@@ -45,6 +45,7 @@ router.post("/", authMiddleware, async (req, res) => {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       teacher: req.user.id,
+      students: [],
     };
 
     const cls = await Class.create(payload);

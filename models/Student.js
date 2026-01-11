@@ -5,11 +5,11 @@ const studentSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
       unique: true, // one user = one student
     },
     name: { type: String, required: true },
-    enrollNo: { type: String, required: true, unique: true },
+enrollNo: { type: String, required: true },
     contact: { type: String, required: true },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -23,5 +23,10 @@ const studentSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+studentSchema.index(
+  { classId: 1, enrollNo: 1 },
+  { unique: true }
+);
+
 
 module.exports = mongoose.model("Student", studentSchema);

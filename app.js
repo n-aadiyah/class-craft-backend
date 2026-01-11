@@ -9,22 +9,22 @@ const path = require("path");
 dotenv.config();
 
 const app = express();
-
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://class-craft-gayatri.netlify.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 // Middleware
 app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000", // for local testing
-      "https://class-craft-gayatri.netlify.app", // your live frontend
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true, // allows cookies or authorization headers if needed
-  })
-);
+
 // Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)

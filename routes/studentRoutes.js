@@ -61,15 +61,21 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
       });
     }
 
-    const student = await Student.findOne({ user: req.user.id })
+const student = await Student.findOne({
+  user: new mongoose.Types.ObjectId(req.user.id),
+})
+
       .populate("classId", "name grade")
       .lean();
 
     if (!student) {
-      return res.status(404).json({
-        message: "Student profile not found",
-      });
-    }
+  return res.status(404).json({
+    message: "Student profile not assigned yet",
+    code: "STUDENT_NOT_ASSIGNED",
+  });
+}
+
+
 
     const level = student.level ?? 1;
     const xp = student.xp ?? 0;
@@ -239,21 +245,31 @@ router.post("/", authMiddleware, async (req, res) => {
 
     const { name, contact, classId, enrollNo, userId } = req.body;
 
-    if (!name || !contact || !classId || !userId) {
+    // ✅ Required fields
+    if (!name || !contact || !classId) {
       return res.status(400).json({
-        message: "Missing fields: name, contact, classId, userId",
+        message: "Missing fields: name, contact, classId",
       });
     }
 
-    if (!isValidId(classId) || !isValidId(userId)) {
-      return res.status(400).json({ message: "Invalid id" });
+    // ✅ classId must always be valid
+    if (!isValidId(classId)) {
+      return res.status(400).json({ message: "Invalid class id" });
     }
 
-    const existing = await Student.findOne({ user: userId });
-    if (existing) {
-      return res.status(400).json({
-        message: "This user already has a student profile",
-      });
+    // ✅ userId is OPTIONAL — validate ONLY if present
+    if (userId && !isValidId(userId)) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    // ✅ If userId provided, ensure no duplicate student profile
+    if (userId) {
+      const existing = await Student.findOne({ user: userId });
+      if (existing) {
+        return res.status(400).json({
+          message: "This user already has a student profile",
+        });
+      }
     }
 
     const cls = await ensureClassOwnershipOrAdmin(classId, req.user);
@@ -265,10 +281,12 @@ router.post("/", authMiddleware, async (req, res) => {
       });
     }
 
+    // ✅ Auto-generate enrollNo if missing
     let finalEnroll = enrollNo;
     if (!finalEnroll) {
       const section = parseSectionFromClassName(cls.name);
       const regex = new RegExp(`^${section}(\\d+)$`, "i");
+
       const existingEnrolls = await Student.find({ classId })
         .select("enrollNo")
         .lean();
@@ -282,18 +300,19 @@ router.post("/", authMiddleware, async (req, res) => {
       finalEnroll = `${section}${String(max + 1).padStart(2, "0")}`;
     }
 
+    // ✅ Create student (attach user only if provided)
     const student = await Student.create({
-      user: userId,
       name,
       contact,
-      classId,
       enrollNo: finalEnroll,
+      classId,
+      ...(userId ? { user: userId } : {}),
     });
 
     res.status(201).json(student);
   } catch (err) {
     console.error("POST /students error:", err);
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: "Failed to create student" });
   }
 });
 
