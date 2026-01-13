@@ -57,6 +57,19 @@ router.post("/", authMiddleware, async (req, res) => {
     res.status(400).json({ message: "Error creating class", error: err.message });
   }
 });
+// routes/classRoutes.js
+router.get("/all", authMiddleware, async (req, res) => {
+  try {
+    if (!["teacher", "admin"].includes(req.user.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const classes = await Class.find().sort({ name: 1 });
+    res.json(classes);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch classes" });
+  }
+});
 
 /**
  * GET /api/classes/my-classes

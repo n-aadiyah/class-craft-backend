@@ -13,7 +13,7 @@ const { authMiddleware } = require("../middleware/authMiddleware");
 router.post("/", authMiddleware, async (req, res) => {
   try {
     if (!["teacher", "admin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Only teachers can create quests" });
+      return res.status(403).json({ message: "Only teachers or admins can create quests" });
     }
 
     const {
@@ -43,16 +43,10 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid classId" });
     }
 
+    // ✅ ONLY check that class exists (NOT ownership)
     const cls = await Class.findById(classId);
     if (!cls) {
       return res.status(404).json({ message: "Class not found" });
-    }
-
-    if (
-      req.user.role === "teacher" &&
-      String(cls.teacher) !== String(req.user.id)
-    ) {
-      return res.status(403).json({ message: "You do not own this class" });
     }
 
     const xp = Number(rewardXP);
@@ -69,15 +63,19 @@ router.post("/", authMiddleware, async (req, res) => {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       status: status || "Active",
-      createdBy: req.user.id,
+      createdBy: req.user.id, // keep track of creator
     });
 
     res.status(201).json(quest);
   } catch (err) {
     console.error("Create quest error:", err);
-    res.status(500).json({ message: "Failed to create quest", error: err.message });
+    res.status(500).json({
+      message: "Failed to create quest",
+      error: err.message,
+    });
   }
 });
+
 
 /* ======================================================
    READ QUESTS (LIST)
