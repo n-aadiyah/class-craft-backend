@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const router = express.Router();
 
 const Student = require("../models/Student");
+const Quest = require("../models/Quest"); // ✅ REQUIRED
+
 const Class = require("../models/Class");
 const { authMiddleware } = require("../middleware/authMiddleware");
 
@@ -55,49 +57,85 @@ async function ensureClassOwnershipOrAdmin(classId, user) {
  */
 router.get("/dashboard", authMiddleware, async (req, res) => {
   try {
+    // only students allowed
     if (req.user.role !== "student") {
-      return res.status(403).json({
-        message: "Access denied: students only",
-      });
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-const student = await Student.findOne({
-  user: new mongoose.Types.ObjectId(req.user.id),
-})
-
-      .populate("classId", "name grade")
-      .lean();
+    // find student linked to user
+    const student = await Student.findOne({ user: req.user.id })
+      .populate("classId", "name grade");
 
     if (!student) {
-  return res.status(404).json({
-    message: "Student profile not assigned yet",
-    code: "STUDENT_NOT_ASSIGNED",
-  });
-}
+      return res.status(404).json({ message: "Student profile not found" });
+    }
 
-    const level = student.level ?? 1;
-    const xp = student.xp ?? 0;
-    const nextLevelXp = level * 100;
+    // fetch quests assigned to student's class
+    const quests = await Quest.find({
+      classId: student.classId,
+      status: "Active",
+    }).sort({ startDate: 1 });
+
+    // derived values (safe defaults)
+    const completedTasks = 0; // future: from submissions
+    const totalTasks = quests.length;
 
     res.json({
       student: {
+        _id: student._id,
         name: student.name,
-        level,
-        xp,
-        nextLevelXp,
-        enrollNo: student.enrollNo,
-        class: student.classId,
+        level: student.level,
+        xp: student.xp,
+        nextLevelXp: (student.level + 1) * 100,
+        completedTasks,
+        totalTasks,
+        xpHistory: student.xpHistory || [],
+        enrollmentNo: student.enrollNo,
+        course: student.classId?.name,
+        batch: student.classId?.grade,
+        bio: student.bio || "",
       },
-      tasks: [],
-      assignments: [],
+      quests, // 👈 optional (for tasks page later)
     });
   } catch (err) {
     console.error("Student dashboard error:", err);
     res.status(500).json({
       message: "Failed to load student dashboard",
+      error: err.message,
     });
   }
 });
+router.get("/tasks", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    // find student linked to logged-in user
+    const student = await Student.findOne({ user: req.user.id });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student profile not found" });
+    }
+
+    // fetch active quests for student's class
+    const tasks = await Quest.find({
+      classId: student.classId,
+      status: "Active",
+    })
+      .sort({ startDate: 1 })
+      .lean();
+
+    res.json(tasks);
+  } catch (err) {
+    console.error("Student tasks error:", err);
+    res.status(500).json({
+      message: "Failed to load student tasks",
+      error: err.message,
+    });
+  }
+});
+
 
 /**
  * GET /count-by-teacher

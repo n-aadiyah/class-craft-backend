@@ -209,5 +209,36 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Failed to delete quest", error: err.message });
   }
 });
+/* ======================================================*/
+router.post("/tasks/:questId/complete", authMiddleware, async (req, res) => {
+  if (req.user.role !== "student") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  const student = await Student.findOne({ user: req.user.id });
+  const quest = await Quest.findById(req.params.questId);
+
+  if (!student || !quest) {
+    return res.status(404).json({ message: "Not found" });
+  }
+
+  // add XP
+  student.xp += quest.rewardXP;
+
+  // OPTIONAL: track completed quests
+  student.completedQuests = student.completedQuests || [];
+  if (!student.completedQuests.includes(quest._id)) {
+    student.completedQuests.push(quest._id);
+  }
+
+  await student.save();
+
+  res.json({
+    message: "Quest completed",
+    gainedXP: quest.rewardXP,
+    totalXP: student.xp
+  });
+});
+
 
 module.exports = router;
