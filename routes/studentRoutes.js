@@ -75,8 +75,6 @@ const student = await Student.findOne({
   });
 }
 
-
-
     const level = student.level ?? 1;
     const xp = student.xp ?? 0;
     const nextLevelXp = level * 100;
