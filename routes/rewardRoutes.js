@@ -22,6 +22,28 @@ router.post("/", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    // ✅ validate ObjectIds
+    if (
+      !mongoose.Types.ObjectId.isValid(studentId) ||
+      !mongoose.Types.ObjectId.isValid(classId)
+    ) {
+      return res.status(400).json({ message: "Invalid student or class ID" });
+    }
+
+    // ✅ fetch student
+    const studentDoc = await Student.findById(studentId);
+    if (!studentDoc) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // ✅ enforce student–class integrity
+    if (String(studentDoc.classId) !== String(classId)) {
+      return res.status(400).json({
+        message: "Student does not belong to the selected class",
+      });
+    }
+
+    // ✅ create reward
     const reward = await Reward.create({
       student: studentId,
       classId,
@@ -32,19 +54,18 @@ router.post("/", authMiddleware, async (req, res) => {
       createdBy: req.user.id,
     });
 
-    // 🔥 IMPORTANT: increment student XP
+    // ✅ increment XP + history (atomic)
     await Student.findByIdAndUpdate(studentId, {
-  $inc: { xp: Number(xp) },
-  $push: {
-    xpHistory: {
-      xp: Number(xp),
-      source: "reward",
-      reason,
-      date: new Date(),
-    },
-  },
-});
-
+      $inc: { xp: Number(xp) },
+      $push: {
+        xpHistory: {
+          xp: Number(xp),
+          source: "reward",
+          reason,
+          date: new Date(),
+        },
+      },
+    });
 
     res.status(201).json(reward);
   } catch (err) {
@@ -55,8 +76,6 @@ router.post("/", authMiddleware, async (req, res) => {
     });
   }
 });
-
-
 
 router.get("/", authMiddleware, async (req, res) => {
   try {
