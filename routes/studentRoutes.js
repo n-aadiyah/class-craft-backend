@@ -416,5 +416,31 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
+router.get("/rewards", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const student = await Student.findOne({ user: req.user.id });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const rewards = await Reward.find({ student: student._id })
+      .populate("classId", "name grade")
+      .sort({ date: -1 })
+      .lean();
+
+    res.json(rewards);
+  } catch (err) {
+    console.error("Student rewards error:", err);
+    res.status(500).json({
+      message: "Failed to load rewards",
+      error: err.message,
+    });
+  }
+});
+
 
 module.exports = router;
