@@ -49,7 +49,7 @@ const rewardRoutes = require("./routes/rewardRoutes");
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/classes", classRoutes);
-app.use("/api/students", studentRoutes);
+app.use("/api/Students", studentRoutes);
 app.use('/api/users', userRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/quests", questRoutes);

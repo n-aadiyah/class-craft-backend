@@ -7,6 +7,7 @@ const Quest = require("../models/Quest"); // ✅ REQUIRED
 
 const Class = require("../models/Class");
 const { authMiddleware } = require("../middleware/authMiddleware");
+const Reward = require("../models/Reward"); // ADD THIS
 
 /* =======================
    HELPERS
@@ -66,9 +67,13 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
     const student = await Student.findOne({ user: req.user.id })
       .populate("classId", "name grade");
 
-    if (!student) {
-      return res.status(404).json({ message: "Student profile not found" });
-    }
+   if (!student) {
+  return res.json({
+    onboarding: true,
+    message: "Student profile not assigned yet",
+  });
+}
+
 
     // fetch quests assigned to student's class
     const quests = await Quest.find({
@@ -122,8 +127,8 @@ router.get("/tasks", authMiddleware, async (req, res) => {
     }).lean();
 
     const completedSet = new Set(
-      student.completedQuests.map((c) => String(c.quest))
-    );
+  (student.completedQuests || []).map((c) => String(c.quest))
+);
 
     const tasks = quests.map((q) => ({
       _id: q._id,
@@ -158,10 +163,11 @@ router.post("/tasks/:id/complete", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    const alreadyCompleted = student.completedQuests.some(
+    const completedQuests = student.completedQuests || [];
+
+    const alreadyCompleted = completedQuests.some(
       (c) => String(c.quest) === questId
     );
-
     if (alreadyCompleted) {
       return res.status(400).json({ message: "Task already completed" });
     }
@@ -171,11 +177,23 @@ router.post("/tasks/:id/complete", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    if (String(quest.classId) !== String(student.classId)) {
+      return res.status(403).json({ message: "Quest not assigned to your class" });
+    }
+
     // award XP
     student.xp += quest.rewardXP;
+    student.level = Math.floor(student.xp / 100) + 1;
 
     student.completedQuests.push({
       quest: quest._id,
+    });
+
+    student.xpHistory.push({
+      xp: quest.rewardXP,
+      source: "quest",
+      reason: quest.title,
+      date: new Date(),
     });
 
     await student.save();
@@ -186,6 +204,7 @@ router.post("/tasks/:id/complete", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Failed to complete task" });
   }
 });
+
 
 /**
  * GET /count-by-teacher
