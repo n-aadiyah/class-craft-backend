@@ -21,6 +21,18 @@ const studentSchema = new mongoose.Schema(
 
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
+completedQuests: [
+  {
+    quest: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Quest",
+    },
+    completedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
 
     // ✅ XP HISTORY (correct placement)
     xpHistory: [

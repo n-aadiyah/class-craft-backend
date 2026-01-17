@@ -111,31 +111,81 @@ router.get("/tasks", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // find student linked to logged-in user
     const student = await Student.findOne({ user: req.user.id });
-
     if (!student) {
       return res.status(404).json({ message: "Student profile not found" });
     }
 
-    // fetch active quests for student's class
-    const tasks = await Quest.find({
+    const quests = await Quest.find({
       classId: student.classId,
       status: "Active",
-    })
-      .sort({ startDate: 1 })
-      .lean();
+    }).lean();
+
+    const completedSet = new Set(
+      student.completedQuests.map((c) => String(c.quest))
+    );
+
+    const tasks = quests.map((q) => ({
+      _id: q._id,
+      title: q.title,
+      description: q.description,
+      xp: q.rewardXP,
+      dueDate: q.endDate,
+      status: completedSet.has(String(q._id))
+        ? "completed"
+        : "pending",
+    }));
 
     res.json(tasks);
   } catch (err) {
     console.error("Student tasks error:", err);
-    res.status(500).json({
-      message: "Failed to load student tasks",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Failed to load student tasks" });
   }
 });
+router.post("/tasks/:id/complete", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
+    const questId = req.params.id;
+    if (!isValidId(questId)) {
+      return res.status(400).json({ message: "Invalid task id" });
+    }
+
+    const student = await Student.findOne({ user: req.user.id });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const alreadyCompleted = student.completedQuests.some(
+      (c) => String(c.quest) === questId
+    );
+
+    if (alreadyCompleted) {
+      return res.status(400).json({ message: "Task already completed" });
+    }
+
+    const quest = await Quest.findById(questId);
+    if (!quest) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // award XP
+    student.xp += quest.rewardXP;
+
+    student.completedQuests.push({
+      quest: quest._id,
+    });
+
+    await student.save();
+
+    res.json({ message: "Task completed successfully" });
+  } catch (err) {
+    console.error("Complete task error:", err);
+    res.status(500).json({ message: "Failed to complete task" });
+  }
+});
 
 /**
  * GET /count-by-teacher
@@ -227,6 +277,31 @@ router.get("/class/:classId", authMiddleware, async (req, res) => {
     res
       .status(err.code || 500)
       .json({ message: err.message || "Error" });
+  }
+});
+router.get("/rewards", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const student = await Student.findOne({ user: req.user.id });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const rewards = await Reward.find({ student: student._id })
+      .populate("classId", "name grade")
+      .sort({ date: -1 })
+      .lean();
+
+    res.json(rewards);
+  } catch (err) {
+    console.error("Student rewards error:", err);
+    res.status(500).json({
+      message: "Failed to load rewards",
+      error: err.message,
+    });
   }
 });
 
@@ -416,31 +491,5 @@ router.delete("/:id", authMiddleware, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
-router.get("/rewards", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "student") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const student = await Student.findOne({ user: req.user.id });
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const rewards = await Reward.find({ student: student._id })
-      .populate("classId", "name grade")
-      .sort({ date: -1 })
-      .lean();
-
-    res.json(rewards);
-  } catch (err) {
-    console.error("Student rewards error:", err);
-    res.status(500).json({
-      message: "Failed to load rewards",
-      error: err.message,
-    });
-  }
-});
-
 
 module.exports = router;
