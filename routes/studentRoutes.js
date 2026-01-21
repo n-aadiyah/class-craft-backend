@@ -82,8 +82,8 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
     }).sort({ startDate: 1 });
 
     // derived values (safe defaults)
-    const completedTasks = 0; // future: from submissions
-    const totalTasks = quests.length;
+   const completedTasks = student.completedQuests?.length || 0;
+const totalTasks = quests.length;
 
     res.json({
       student: {
@@ -93,8 +93,8 @@ router.get("/dashboard", authMiddleware, async (req, res) => {
         xp: student.xp,
         nextLevelXp: (student.level + 1) * 100,
         completedTasks,
-        totalTasks,
-        xpHistory: student.xpHistory || [],
+    totalTasks,
+    xpHistory: student.xpHistory || [],
         enrollmentNo: student.enrollNo,
         course: student.classId?.name,
         batch: student.classId?.grade,
