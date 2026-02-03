@@ -9,21 +9,26 @@ const path = require("path");
 dotenv.config();
 
 const app = express();
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "https://class-craft-gayatri.netlify.app",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
-  })
-);
-// Middleware
+const corsConfig = {
+  origin: [
+    "http://localhost:3000",
+    "https://class-craft-gayatri.netlify.app",
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cache-Control",
+    "Pragma",
+  ],
+  credentials: true,
+};
+
+
 app.use(express.json());
-app.use(cors());
-app.use(morgan("dev"));
 app.use(cookieParser());
+app.use(morgan("dev"));
+app.use(cors(corsConfig)); // ✅ enough for OPTIONS
 
 // Connect to MongoDB
 mongoose
