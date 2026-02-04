@@ -30,6 +30,8 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 app.use(cors(corsConfig)); // ✅ enough for OPTIONS
 
+// static files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)

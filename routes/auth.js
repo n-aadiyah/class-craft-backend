@@ -3,118 +3,115 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const crypto = require("crypto");
 const dotenv = require("dotenv");
+
+const User = require("../models/User");
+const sendEmail = require("../utils/sendEmail");
 
 dotenv.config();
 
-// ✅ REGISTER - POST /api/auth/register
+/* =========================
+   HELPERS
+========================= */
+
+// Decide frontend URL (localhost vs production)
+const getFrontendUrl = (req) => {
+  const origin = req.headers.origin || "";
+
+  if (origin.includes("localhost")) {
+    return process.env.FRONTEND_URL_LOCAL || "http://localhost:3000";
+  }
+
+  return process.env.FRONTEND_URL_PROD || "https://class-craft-gayatri.netlify.app";
+};
+
+/* =========================
+   REGISTER
+   POST /api/auth/register
+========================= */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Check for missing fields
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Password length check
     if (password.length < 6) {
       return res
         .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
+        .json({ message: "Password must be at least 6 characters" });
     }
 
-    // Normalize email
     const normalizedEmail = email.toLowerCase();
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
-    const newUser = new User({
+    // ❗ password hashing handled by User model pre-save hook
+    const user = new User({
       name,
       email: normalizedEmail,
-      password: hashedPassword,
-      role: role || "student", // Default role
+      password,
+      role: role || "student",
     });
 
-    await newUser.save();
+    await user.save();
 
     res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    console.error("Registration Error:", error);
+  } catch (err) {
+    console.error("Register error:", err);
     res.status(500).json({ message: "Server error during registration" });
   }
 });
 
-// routes/auth.js — robust debug login handler
+/* =========================
+   LOGIN
+   POST /api/auth/login
+========================= */
 router.post("/login", async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    // require only email + password
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET missing in .env");
-      return res.status(500).json({ message: "Server configuration error" });
+      return res
+        .status(500)
+        .json({ message: "JWT secret not configured" });
     }
 
-    // fetch user including the password (schema has select: false)
-    const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
-
-    console.log("DEBUG login: user fetched:", !!user, user ? { id: user._id, role: user.role } : null);
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+    }).select("+password");
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // show actual stored password shape for debugging (truncate for safety)
-    const stored = user.password;
-    console.log("DEBUG login: typeof stored password:", typeof stored);
-    if (stored && typeof stored === "string") {
-      console.log("DEBUG login: stored hash (start):", stored.slice(0, 10));
-    } else {
-      console.log("DEBUG login: stored password value is falsy or not string:", stored);
-    }
-
-    // optional: role match check
     if (role && user.role !== role) {
       return res.status(403).json({ message: "Role mismatch" });
     }
 
-    // Defensive: if stored hash is missing or not a string -> error
-    if (!stored || typeof stored !== "string") {
-      console.error("Login error: user.password missing or malformed for user:", user._id);
-      return res.status(500).json({ message: "Server misconfiguration: user password missing or malformed" });
-    }
-
-    // Use synchronous compare to avoid callback/promise mismatch across bcrypt libraries
-    let isMatch = false;
-    try {
-      isMatch = bcrypt.compareSync(password, stored);
-    } catch (cmpErr) {
-      console.error("bcrypt.compareSync error:", cmpErr && cmpErr.stack ? cmpErr.stack : cmpErr);
-      return res.status(500).json({ message: "Server error verifying password", error: String(cmpErr) });
-    }
-
+    const isMatch = bcrypt.compareSync(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    return res.status(200).json({
+    res.json({
       message: "Login successful",
       token,
       user: {
@@ -125,11 +122,99 @@ router.post("/login", async (req, res) => {
         avatarUrl: user.avatarUrl,
       },
     });
-  } catch (error) {
-    console.error("Login Error (catch):", error && error.stack ? error.stack : error);
-    return res.status(500).json({ message: "Server error during login", error: error.message || String(error) });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ message: "Server error during login" });
   }
 });
 
+/* =========================
+   FORGOT PASSWORD
+   POST /api/auth/forgot-password
+========================= */
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const email = req.body.email?.toLowerCase();
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // 🔒 prevent email enumeration
+      return res.json({
+        message: "If the email exists, a reset link has been sent",
+      });
+    }
+
+    // generate token (method must exist in User model)
+    const resetToken = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
+
+    const frontendUrl = getFrontendUrl(req);
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+console.log("RESET TOKEN (DEV ONLY):", resetToken);
+
+    await sendEmail({
+      to: user.email,
+      subject: "Password Reset Request",
+      text:
+        `You requested a password reset.\n\n` +
+        `Click the link below (valid for 15 minutes):\n` +
+        `${resetUrl}\n\n` +
+        `If you did not request this, please ignore this email.`,
+    });
+
+    res.json({
+      message: "If the email exists, a reset link has been sent",
+    });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/* =========================
+   RESET PASSWORD
+   PUT /api/auth/reset-password/:token
+========================= */
+router.put("/reset-password/:token", async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
+    }
+
+    const resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(req.params.token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "Invalid or expired reset token" });
+    }
+
+    user.password = password; // 🔐 hashed by pre-save hook
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 module.exports = router;
